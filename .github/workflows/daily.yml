@@ -33,4 +33,8 @@ jobs:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           FEISHU_DOCX_DOCUMENT_ID: ${{ secrets.FEISHU_DOCX_DOCUMENT_ID }}
+          AI_NEWS_LIMIT: ${{ vars.AI_NEWS_LIMIT }}
+          AI_NEWS_LOOKBACK_DAYS: ${{ vars.AI_NEWS_LOOKBACK_DAYS }}
+          AI_NEWS_MAX_PER_SOURCE: ${{ vars.AI_NEWS_MAX_PER_SOURCE }}
+          AI_NEWS_SOURCES_JSON: ${{ vars.AI_NEWS_SOURCES_JSON }}
         run: python main.py
