@@ -133,10 +133,11 @@ def build_test_daily_report_blocks(today: str) -> List[Dict[str, Any]]:
 def build_ai_news_report_blocks(report_date: str, news_items: Iterable[Any]) -> List[Dict[str, Any]]:
     """把 AI 新闻列表转换成飞书 Docx API 需要的块结构。"""
     blocks = [
-        build_heading1_block("每日 AI 新闻日报"),
+        build_heading1_block("每日 AI 前沿新闻日报"),
         build_text_block(f"日期：{report_date}"),
-        build_text_block("来源：公开新闻 RSS。内容由程序自动抓取标题、摘要和原文链接生成。"),
-        build_text_block("提示：新闻摘要来自新闻源本身，重要信息建议打开链接核对原文。"),
+        build_text_block("来源：已配置的公开 RSS/Atom 新闻源。程序会自动抓取标题、摘要和原文链接。"),
+        build_text_block("处理方式：按发布时间排序，过滤最近新闻，并按标题和链接去重。"),
+        build_text_block("提示：摘要来自原始新闻源，重要信息建议打开原文链接核对。"),
     ]
 
     for index, item in enumerate(news_items, start=1):
@@ -151,7 +152,7 @@ def build_ai_news_report_blocks(report_date: str, news_items: Iterable[Any]) -> 
                 build_text_block(f"{index}. {title}"),
                 build_text_block(f"来源：{source}｜发布时间：{published}"),
                 build_text_block(f"摘要：{summary}"),
-                build_text_block(f"链接：{link}"),
+                build_text_block(f"原文链接：{link}"),
             ]
         )
 

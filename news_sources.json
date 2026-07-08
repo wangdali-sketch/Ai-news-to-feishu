@@ -1,0 +1,70 @@
+{
+  "sources": [
+    {
+      "name": "Google News 中文 AI",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search",
+      "params": {
+        "q": "AI模型 OR 大模型 OR 智能体 OR OpenAI OR Anthropic OR DeepSeek OR Gemini OR Claude OR NVIDIA when:{lookback_days}d",
+        "hl": "zh-CN",
+        "gl": "CN",
+        "ceid": "CN:zh-Hans"
+      }
+    },
+    {
+      "name": "Google News 国际 AI",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search",
+      "params": {
+        "q": "\"AI model\" OR \"large language model\" OR \"AI agent\" OR OpenAI OR Anthropic OR DeepMind OR NVIDIA OR Gemini OR Claude when:{lookback_days}d",
+        "hl": "en-US",
+        "gl": "US",
+        "ceid": "US:en"
+      }
+    },
+    {
+      "name": "OpenAI News",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://openai.com/news/rss.xml"
+    },
+    {
+      "name": "Google AI Blog",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://blog.google/technology/ai/rss/"
+    },
+    {
+      "name": "Hugging Face Blog",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://huggingface.co/blog/feed.xml"
+    },
+    {
+      "name": "NVIDIA AI Blog",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://blogs.nvidia.com/blog/category/deep-learning/feed/"
+    },
+    {
+      "name": "Microsoft AI Blog",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://www.microsoft.com/en-us/ai/blog/feed/"
+    },
+    {
+      "name": "AWS Machine Learning Blog",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://aws.amazon.com/blogs/machine-learning/feed/"
+    },
+    {
+      "name": "arXiv cs.AI",
+      "type": "rss",
+      "enabled": true,
+      "url": "https://export.arxiv.org/rss/cs.AI"
+    }
+  ]
+}

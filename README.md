@@ -1,19 +1,28 @@
 # Ai-news-to-feishu
 
-这个项目用于每天抓取 AI 新闻，并写入飞书 Docx 文档。
+这个项目用于每天抓取最新 AI 前沿新闻，并写入飞书 Docx 文档。
 
 当前支持三种运行方式：
 
-- 本地手动运行：你在 Windows 终端运行 `python main.py`
+- 本地手动运行：在 Windows 终端运行 `python main.py`
 - 本地自动运行：Windows 任务计划程序每天运行 `run_daily.bat`
 - 云端自动运行：GitHub Actions 每天运行 `.github/workflows/daily.yml`
 
-## 1. 项目文件说明
+## 1. 当前是不是固定模板
+
+不是。
+
+正式入口 `main.py` 会调用 `news_fetcher.fetch_ai_news()`，它会通过 `requests` 访问 RSS/Atom 新闻源，读取最新标题、摘要、发布时间和原文链接。
+
+固定模板只保留在 `test_feishu_write.py`，它只用于测试飞书写入权限，不用于每日新闻日报。
+
+## 2. 项目文件说明
 
 ```text
 main.py                         正式运行脚本：抓取 AI 新闻并写入飞书
-feishu_client.py                飞书接口封装
-news_fetcher.py                 新闻 RSS 抓取和清洗
+feishu_client.py                飞书接口封装和飞书 Docx 内容块生成
+news_fetcher.py                 新闻 RSS/Atom 抓取、清洗、去重和排序
+news_sources.json               默认 AI 新闻源配置
 test_feishu_write.py            最小飞书写入测试
 run_daily.bat                   Windows 本地每日自动运行脚本
 setup_daily_task.ps1            创建 Windows 每日计划任务
@@ -24,7 +33,7 @@ requirements.txt                Python 依赖
 README.md                       使用说明
 ```
 
-## 2. 本地 .env 配置
+## 3. 本地 .env 配置
 
 本地运行时使用 `.env` 文件保存飞书配置。
 
@@ -40,7 +49,18 @@ Copy-Item .env.example .env
 FEISHU_APP_ID=你的飞书自建应用 App ID
 FEISHU_APP_SECRET=你的飞书自建应用 App Secret
 FEISHU_DOCX_DOCUMENT_ID=你的飞书 Docx 文档 ID
+AI_NEWS_LIMIT=8
+AI_NEWS_LOOKBACK_DAYS=2
+AI_NEWS_MAX_PER_SOURCE=3
+AI_NEWS_SOURCES_FILE=news_sources.json
 ```
+
+说明：
+
+- `AI_NEWS_LIMIT`：每天最多写入几条新闻，默认 8 条。
+- `AI_NEWS_LOOKBACK_DAYS`：抓取最近几天的新闻，默认最近 2 天。
+- `AI_NEWS_MAX_PER_SOURCE`：单个新闻源优先最多选几条，默认 3 条，避免一个来源刷屏。
+- `AI_NEWS_SOURCES_FILE`：新闻源配置文件，默认 `news_sources.json`。
 
 注意：
 
@@ -48,7 +68,65 @@ FEISHU_DOCX_DOCUMENT_ID=你的飞书 Docx 文档 ID
 - 不要把 `.env` 上传到 GitHub。
 - `.gitignore` 已经包含 `.env` 和 `.env.txt`。
 
-## 3. 本地安装依赖
+## 4. 配置 AI 新闻源
+
+默认新闻源在：
+
+```text
+news_sources.json
+```
+
+默认包含：
+
+- Google News 中文 AI 搜索
+- Google News 国际 AI 搜索
+- OpenAI News
+- Google AI Blog
+- Hugging Face Blog
+- arXiv cs.AI
+
+如果你想关闭某个新闻源，把它的 `enabled` 改成 `false`：
+
+```json
+{
+  "name": "arXiv cs.AI",
+  "type": "rss",
+  "enabled": false,
+  "url": "https://export.arxiv.org/rss/cs.AI"
+}
+```
+
+如果你想新增 RSS 新闻源，在 `sources` 列表里加一项：
+
+```json
+{
+  "name": "你的新闻源名称",
+  "type": "rss",
+  "enabled": true,
+  "url": "https://example.com/feed.xml"
+}
+```
+
+如果新闻源需要查询参数，可以这样写：
+
+```json
+{
+  "name": "自定义搜索源",
+  "type": "rss",
+  "enabled": true,
+  "url": "https://news.google.com/rss/search",
+  "params": {
+    "q": "AI OR OpenAI when:{lookback_days}d",
+    "hl": "zh-CN",
+    "gl": "CN",
+    "ceid": "CN:zh-Hans"
+  }
+}
+```
+
+`{lookback_days}` 会自动替换成 `.env` 或 GitHub Variables 里的 `AI_NEWS_LOOKBACK_DAYS`。
+
+## 5. 本地安装依赖
 
 进入项目目录：
 
@@ -62,7 +140,7 @@ cd D:\Ai-news-to-feishu
 python -m pip install -r requirements.txt
 ```
 
-## 4. 本地手动运行
+## 6. 本地手动运行
 
 只测试飞书写入：
 
@@ -76,7 +154,7 @@ python test_feishu_write.py
 python main.py
 ```
 
-## 5. 本地 Windows 每日自动运行
+## 7. 本地 Windows 每日自动运行
 
 默认每天早上 08:00 自动运行：
 
@@ -108,7 +186,7 @@ schtasks /Run /TN "AiNewsToFeishuDaily"
 D:\Ai-news-to-feishu\logs
 ```
 
-## 6. GitHub Actions 云端每日自动运行
+## 8. GitHub Actions 云端每日自动运行
 
 云端运行不需要你的电脑开机。
 
@@ -127,62 +205,15 @@ GitHub Actions 会读取 GitHub Secrets，不会读取本地 `.env` 文件。
 - `pip install -r requirements.txt`
 - `python main.py`
 
-## 7. 把项目上传到 GitHub
+## 9. 在 GitHub 仓库里添加 Secrets
 
-先在 GitHub 网页创建一个新仓库，例如：
+打开仓库页面：
 
 ```text
-Ai-news-to-feishu
+https://github.com/wangdali-sketch/Ai-news-to-feishu
 ```
 
-然后在本地 Windows 终端运行下面命令。
-
-如果当前目录还不是 Git 仓库：
-
-```powershell
-cd D:\Ai-news-to-feishu
-git init
-git branch -M main
-```
-
-检查 `.env` 不会被提交：
-
-```powershell
-git status --ignored
-```
-
-你应该看到 `.env` 在 ignored files 里面。
-
-添加并提交代码：
-
-```powershell
-git add .
-git commit -m "添加飞书 AI 新闻日报自动运行"
-```
-
-绑定你的 GitHub 仓库地址。把下面地址换成你自己的仓库地址：
-
-```powershell
-git remote add origin https://github.com/你的用户名/Ai-news-to-feishu.git
-```
-
-推送到 GitHub：
-
-```powershell
-git push -u origin main
-```
-
-如果你已经有 Git 仓库，只需要执行：
-
-```powershell
-git add .
-git commit -m "添加 GitHub Actions 每日自动运行"
-git push
-```
-
-## 8. 在 GitHub 仓库里添加 Secrets
-
-打开你的 GitHub 仓库页面，然后按下面步骤操作：
+然后按下面步骤操作：
 
 1. 点击 `Settings`
 2. 点击左侧 `Secrets and variables`
@@ -207,13 +238,45 @@ Name: FEISHU_DOCX_DOCUMENT_ID
 Secret: 你的飞书 Docx 文档 ID
 ```
 
-注意：
+## 10. 在 GitHub 仓库里添加可选 Variables
 
-- Secret 名称必须完全一致。
-- 不要多写空格。
-- 不需要把 `.env` 上传到 GitHub。
+这一步不是必须的。
 
-## 9. 设置每天几点运行
+如果你想在 GitHub 网页上修改抓取条数或时间范围，可以添加 Variables：
+
+1. 点击 `Settings`
+2. 点击左侧 `Secrets and variables`
+3. 点击 `Actions`
+4. 点击 `Variables`
+5. 点击 `New repository variable`
+
+可选变量：
+
+```text
+Name: AI_NEWS_LIMIT
+Value: 8
+```
+
+```text
+Name: AI_NEWS_LOOKBACK_DAYS
+Value: 2
+```
+
+```text
+Name: AI_NEWS_MAX_PER_SOURCE
+Value: 3
+```
+
+如果你想完全用 GitHub Variables 覆盖新闻源，可以添加：
+
+```text
+Name: AI_NEWS_SOURCES_JSON
+Value: 一整段 JSON 新闻源配置
+```
+
+一般新手不需要设置 `AI_NEWS_SOURCES_JSON`，直接修改 `news_sources.json` 更简单。
+
+## 11. 设置每天几点运行
 
 GitHub Actions 的定时任务使用 UTC 时间，不是中国时间。
 
@@ -254,22 +317,7 @@ schedule:
 .github/workflows/daily.yml
 ```
 
-改完后提交并推送：
-
-```powershell
-git add .github/workflows/daily.yml README.md
-git commit -m "修改 GitHub Actions 运行时间"
-git push
-```
-
-说明：
-
-- GitHub Actions 定时任务可能会有几分钟延迟。
-- 如果 GitHub 当时很忙，运行时间不一定精确到分钟。
-
-## 10. 手动触发一次 GitHub Actions 测试
-
-上传代码并添加 Secrets 后，可以手动运行一次测试。
+## 12. 手动触发一次 GitHub Actions 测试
 
 步骤：
 
@@ -284,7 +332,7 @@ git push
 
 注意：手动触发会真的写入飞书文档。
 
-## 11. 如果 GitHub Actions 运行失败，在哪里看日志
+## 13. 如果 GitHub Actions 运行失败，在哪里看日志
 
 查看日志步骤：
 
@@ -310,31 +358,21 @@ git push
 如果看到类似：
 
 ```text
-飞书接口返回错误
-permission
-forbidden
-access denied
-```
-
-说明飞书应用可能没有文档权限，或者目标文档没有授权给应用。
-
-如果看到类似：
-
-```text
 没有抓取到可用的 AI 新闻
 ```
 
-说明新闻源暂时不可用，或者 GitHub Actions 环境访问新闻源失败。
+说明所有新闻源都暂时不可用，或者 GitHub Actions 环境访问新闻源失败。
 
-## 12. 成功后飞书文档里会看到什么
+## 14. 成功后飞书文档里会看到什么
 
 飞书文档里会新增一篇日报：
 
 ```text
-每日 AI 新闻日报
+每日 AI 前沿新闻日报
 日期：自动获取今天日期
-来源：公开新闻 RSS。内容由程序自动抓取标题、摘要和原文链接生成。
-提示：新闻摘要来自新闻源本身，重要信息建议打开链接核对原文。
+来源：已配置的公开 RSS/Atom 新闻源。程序会自动抓取标题、摘要和原文链接。
+处理方式：按发布时间排序，过滤最近新闻，并按标题和链接去重。
+提示：摘要来自原始新闻源，重要信息建议打开原文链接核对。
 ```
 
 下面会有多条 AI 新闻，每条包含：
@@ -344,5 +382,5 @@ access denied
 来源
 发布时间
 摘要
-链接
+原文链接
 ```
