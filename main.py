@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -10,8 +11,11 @@ def run_once():
     """本地运行一次：抓取 AI 新闻日报并写入飞书 Docx 文档。"""
     load_dotenv()
 
-    print("正在抓取 AI 新闻...")
-    news_items = fetch_ai_news(limit=8)
+    news_limit = _get_int_env("AI_NEWS_LIMIT", 8)
+    lookback_days = _get_int_env("AI_NEWS_LOOKBACK_DAYS", 2)
+
+    print(f"正在抓取最近 {lookback_days} 天的 AI 前沿新闻...")
+    news_items = fetch_ai_news(limit=news_limit, lookback_days=lookback_days)
 
     report_date = datetime.now().strftime("%Y-%m-%d")
     blocks = build_ai_news_report_blocks(report_date, news_items)
@@ -28,6 +32,18 @@ def run_once():
     print(f"新闻数量：{len(news_items)}")
     print(f"新增块数量：{block_count}")
     return result
+
+
+def _get_int_env(name: str, default: int) -> int:
+    """读取整数环境变量。"""
+    raw_value = os.getenv(name, "").strip()
+    if not raw_value:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return default
+    return max(value, 1)
 
 
 if __name__ == "__main__":
