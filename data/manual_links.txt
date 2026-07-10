@@ -1,0 +1,8 @@
+# 每行放一个无需登录即可打开的公开链接。
+# 支持公众号、抖音、B站、小红书、X、Reddit、Hacker News 和普通网页。
+# 示例（请删除 xxxx 并替换成真实链接后再运行）：
+# https://mp.weixin.qq.com/xxxx
+# https://www.douyin.com/video/xxxx
+# https://www.bilibili.com/video/xxxx
+# https://x.com/xxxx/status/xxxx
+# https://www.xiaohongshu.com/explore/xxxx

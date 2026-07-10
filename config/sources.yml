@@ -1,0 +1,77 @@
+# 所有来源都必须是无需登录即可访问的公开页面、RSS、官方 API 或 RSSHub。
+rss_sources:
+  - name: Google News 中文 AI
+    url: https://news.google.com/rss/search
+    category: industry_news
+    params:
+      q: AI模型 OR 大模型 OR 智能体 OR OpenAI OR Anthropic OR DeepSeek OR Gemini OR Claude
+      hl: zh-CN
+      gl: CN
+      ceid: CN:zh-Hans
+
+  - name: OpenAI Blog
+    url: https://openai.com/news/rss.xml
+    category: official_blog
+
+  - name: Google AI Blog
+    url: https://blog.google/technology/ai/rss/
+    category: official_blog
+
+  - name: arXiv cs.AI
+    url: https://export.arxiv.org/rss/cs.AI
+    category: paper
+
+  - name: AWS Machine Learning Blog
+    url: https://aws.amazon.com/blogs/machine-learning/feed/
+    category: official_blog
+
+  - name: Hacker News AI
+    url: https://hnrss.org/newest?q=AI
+    platform: hackernews
+    category: social_discussion
+
+  # Reddit RSS 有时会限制云服务器访问，因此默认关闭，可按需启用。
+  - name: Reddit MachineLearning
+    url: https://www.reddit.com/r/MachineLearning/new/.rss
+    platform: reddit
+    category: social_discussion
+    enabled: false
+
+github_sources:
+  - name: GitHub Trending AI
+    url: https://github.com/trending/python?since=daily
+    category: open_source
+
+manual_links:
+  - name: 手动收藏链接
+    file: data/manual_links.txt
+    category: manual
+
+# 可添加无需登录的普通公开网页。适合行业报告、工具更新页和教程。
+web_sources: []
+
+social_sources:
+  - name: X AI Accounts
+    type: x
+    enabled: false
+    note: 需要 X 官方 API、第三方搜索 API 或自建 RSSHub
+
+  - name: 微信公众号
+    type: wechat
+    enabled: false
+    note: 建议使用 RSSHub、公开分享链接或手动收藏链接
+
+  - name: 抖音
+    type: douyin
+    enabled: false
+    note: 建议使用公开分享链接或第三方搜索 API，不能绕过平台限制
+
+  - name: B站 AI 视频
+    type: bilibili
+    enabled: false
+    note: 可通过 RSSHub 或公开搜索结果接入
+
+  - name: 小红书 AI
+    type: xiaohongshu
+    enabled: false
+    note: 建议使用公开分享链接或合规搜索 API
