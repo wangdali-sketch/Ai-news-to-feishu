@@ -289,23 +289,7 @@ logs/daily_YYYY-MM-DD_HH-mm-ss.log
 Get-Content .\logs\daily.log -Tail 80 -Encoding UTF8
 ```
 
-## 十一、Windows 每日自动运行
-
-默认每天 08:00：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup_daily_task.ps1
-```
-
-改成每天 09:30：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup_daily_task.ps1 -Time 09:30
-```
-
-`run_daily.bat` 中的 `PROJECT_DIR` 和 `PYTHON_EXE` 必须与本机真实路径一致。
-
-## 十二、GitHub Actions 和 Secrets
+## 十一、GitHub Actions 和 Secrets
 
 打开 GitHub 仓库的 `Settings` → `Secrets and variables` → `Actions`。
 
@@ -354,15 +338,13 @@ AI_RADAR_MAX_PER_SOURCE=4
 
 工作流保留了 `workflow_dispatch`，可以在仓库 `Actions` 页面手动点 `Run workflow` 测试。
 
-工作流默认 `00:00 UTC` 运行，即北京时间 08:00。中国时间等于 UTC 时间加 8 小时，例如：
+项目只保留 GitHub Actions 的每日自动写入。工作流在 `09:05 UTC` 运行，即北京时间每天 17:05。中国时间等于 UTC 时间加 8 小时，例如：
 
 ```text
-UTC 00:00 = 中国时间 08:00
-UTC 01:30 = 中国时间 09:30
-UTC 16:00 = 中国时间次日 00:00
+UTC 09:05 = 中国时间 17:05
 ```
 
-## 十三、调整日报分类
+## 十二、调整日报分类
 
 有两种方法：
 
