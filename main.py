@@ -25,7 +25,6 @@ from content_schema import preferred_url
 from feishu_client import FeishuClient, build_text_block
 from report_generator import (
     constrain_report_length,
-    generate_rule_based_report,
     get_last_length_stats,
     markdown_to_feishu_blocks,
     validate_report,
@@ -110,10 +109,11 @@ def run_once() -> Dict[str, Any]:
         ai_stats["api_calls"],
         ai_stats["single_item_fallbacks"],
     )
-    degraded = ai_report is None
-    LOGGER.info("运行统计｜是否发生降级=%s", "是" if degraded else "否")
+    if not ai_report:
+        raise RuntimeError("AI 未返回日报：已禁止规则降级，本次不会写入飞书")
+    LOGGER.info("运行统计｜是否发生降级=否（项目已禁止规则降级）")
     report_items = ranked_items
-    report = ai_report or generate_rule_based_report(report_items, report_date)
+    report = ai_report
     report, validation = validate_report(report, report_items)
     report = constrain_report_length(report, max_chars=max_report_chars)
     report, final_validation = validate_report(report, report_items)
@@ -191,7 +191,9 @@ def run_local_test() -> Dict[str, Any]:
     )
     ai_stats = get_last_ai_run_stats()
     report_items = ranked_items
-    report = ai_report or generate_rule_based_report(report_items, report_date)
+    if not ai_report:
+        raise RuntimeError("AI 未返回日报：已禁止规则降级，本地测试已终止")
+    report = ai_report
     report, validation = validate_report(report, report_items)
     report = constrain_report_length(report, max_chars=max_report_chars)
     report, final_validation = validate_report(report, report_items)

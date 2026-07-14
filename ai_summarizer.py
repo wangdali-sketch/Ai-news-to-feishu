@@ -44,21 +44,19 @@ def generate_ai_report(
     max_text_per_item: Optional[int] = None,
     max_report_chars: Optional[int] = None,
     min_chinese_chars: int = 10000,
-) -> Optional[str]:
-    """先逐条深度提炼，再让大模型根据结构化结果生成全局日报。"""
+) -> str:
+    """先逐条深度提炼，再让大模型生成日报；任何 AI 失败都禁止规则降级。"""
     _reset_stats()
     api_key = os.getenv("AI_API_KEY", "").strip()
     if not api_key:
-        LOGGER.warning("未配置 AI_API_KEY，已使用规则版日报")
-        return None
+        raise RuntimeError("未配置 AI_API_KEY：为避免写入未翻译内容，本次日报已终止")
 
     max_items = max_items or _get_positive_int_env("MAX_ITEMS_FOR_AI", 10)
     max_text_per_item = max_text_per_item or _get_positive_int_env("MAX_TEXT_PER_ITEM", 3000)
     max_report_chars = max_report_chars or _get_positive_int_env("MAX_REPORT_CHARS", 12000)
     selected_items = list(items)[:max_items]
     if not selected_items:
-        LOGGER.warning("没有可交给大模型的内容，已使用规则版日报")
-        return None
+        raise RuntimeError("没有可交给大模型的内容，本次日报已终止")
 
     settings = _api_settings(api_key, timeout)
     summaries: List[Dict[str, Any]] = []
@@ -67,9 +65,10 @@ def generate_ai_report(
         try:
             summary = _summarize_single_item(compact, settings)
         except (requests.RequestException, ValueError, KeyError, IndexError) as exc:
-            LAST_AI_RUN_STATS["single_item_fallbacks"] += 1
-            LOGGER.warning("第 %s 条内容深度提炼失败，改用规则提炼：%s", index, exc)
-            summary = _rule_summary(compact)
+            LAST_AI_RUN_STATS["global_failed"] = True
+            raise RuntimeError(
+                f"第 {index} 条内容的 AI 翻译总结失败：为避免降级，本次日报已终止"
+            ) from exc
         # 链接属于程序数据，不信任也不采用模型生成的链接。
         summary["原文链接"] = preferred_url(item)
         summary["原始标题"] = item.get("title") or "未获取到标题"
@@ -107,8 +106,7 @@ def generate_ai_report(
         )
     except (requests.RequestException, ValueError, KeyError, IndexError) as exc:
         LAST_AI_RUN_STATS["global_failed"] = True
-        LOGGER.error("全局日报生成失败，已退回规则版日报：%s", exc)
-        return None
+        raise RuntimeError("AI 全局日报生成失败：为避免降级，本次日报已终止") from exc
 
     # 模型遗漏或缩短链接时，由程序根据原始内容强制补回。
     from report_generator import ensure_report_links
@@ -123,8 +121,7 @@ def generate_ai_report(
     LAST_AI_RUN_STATS["chinese_ratio"] = chinese_ratio
     if not _has_required_structure(repaired, report_date):
         LAST_AI_RUN_STATS["global_failed"] = True
-        LOGGER.error("大模型日报缺少固定栏目，已退回规则版日报")
-        return None
+        raise RuntimeError("AI 日报缺少固定栏目：为避免写入残缺内容，本次日报已终止")
     if chinese_characters < min_chinese_chars:
         LOGGER.warning(
             "大模型日报中文字符数不足：%s，开始基于同一批来源进行受约束扩写",
@@ -149,13 +146,13 @@ def generate_ai_report(
             LAST_AI_RUN_STATS["chinese_characters"] = chinese_characters
             LAST_AI_RUN_STATS["chinese_ratio"] = chinese_ratio
         except (requests.RequestException, ValueError, KeyError, IndexError) as exc:
-            LAST_AI_RUN_STATS["global_failed"] = True
-            LOGGER.error("日报扩写失败，已退回规则版日报：%s", exc)
-            return None
+            LOGGER.warning("日报扩写失败，将保留扩写前的 AI 中文版：%s", exc)
     if chinese_characters < min_chinese_chars:
-        LAST_AI_RUN_STATS["global_failed"] = True
-        LOGGER.error("日报扩写后中文字符数仍不足：%s，已退回规则版日报", chinese_characters)
-        return None
+        LOGGER.warning(
+            "AI 日报中文字符数为 %s，低于建议值 %s；保留 AI 中文版，不执行规则降级",
+            chinese_characters,
+            min_chinese_chars,
+        )
     LOGGER.info(
         "两阶段 AI 日报生成完成：逐条提炼 %s 条，规则降级 %s 条",
         len(summaries),

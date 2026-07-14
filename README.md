@@ -381,7 +381,7 @@ AI_RADAR_FORCE_WRITE=true
 4. 如果返回 `403`、验证码或登录页，不要尝试绕过；改用官方 API、RSSHub、搜索 API 或手动链接。
 5. GitHub Trending 没有结果时，可能是当天热门 Python 项目没有命中 AI 关键词。
 6. Reddit 或社媒在 GitHub Actions 中失败时，改用可靠的 RSSHub 实例或官方 API。
-7. 大模型失败不会阻止写入；检查 `AI_BASE_URL`、`AI_MODEL` 和 API 余额。
+7. 大模型失败会终止本次运行，并且不会写入未翻译的规则版日报；请检查 `AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL` 和 API 余额。
 8. 飞书失败时，检查应用权限、文档 ID，以及文档是否已授权给该应用。
 
 如果飞书中的日报仍然主要是标题和链接，先在 `logs/daily.log` 搜索“是否调用 DeepSeek API”和“是否发生降级”，然后检查：

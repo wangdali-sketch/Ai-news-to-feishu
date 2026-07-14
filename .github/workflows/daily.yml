@@ -29,6 +29,15 @@ jobs:
       - name: 安装依赖
         run: python -m pip install -r requirements.txt
 
+      - name: 校验 AI 密钥
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -z "$AI_API_KEY" ]; then
+            echo "::error::未配置 GitHub Actions Secret：AI_API_KEY。为避免写入未翻译日报，本次运行已终止。"
+            exit 1
+          fi
+
       - name: 运行 AI 前沿信息雷达
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}

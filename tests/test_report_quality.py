@@ -234,16 +234,14 @@ def test_feishu_outline_only_uses_daily_title_heading():
     assert link in [block_text(block) for block in blocks]
 
 
-def test_without_api_key_still_generates_rule_report(monkeypatch):
+def test_without_api_key_stops_instead_of_degrading(monkeypatch):
     monkeypatch.delenv("AI_API_KEY", raising=False)
     item = make_item("https://example.com/no-api")
-    assert generate_ai_report([item], "2026-07-09") is None
-    report = generate_rule_based_report([item], "2026-07-09")
-    assert "# AI 前沿信息雷达｜2026-07-09" in report
-    assert "https://example.com/no-api" in report
+    with pytest.raises(RuntimeError, match="本次日报已终止"):
+        generate_ai_report([item], "2026-07-09")
 
 
-def test_api_failure_degrades_without_blocking_feishu_conversion(monkeypatch):
+def test_api_failure_stops_instead_of_degrading(monkeypatch):
     monkeypatch.setenv("AI_API_KEY", "test-key")
     monkeypatch.setattr(ai_summarizer.time, "sleep", lambda *_: None)
 
@@ -252,12 +250,8 @@ def test_api_failure_degrades_without_blocking_feishu_conversion(monkeypatch):
 
     monkeypatch.setattr(ai_summarizer.requests, "post", fail)
     item = make_item("https://example.com/api-failure")
-    ai_report = generate_ai_report([item], "2026-07-09")
-    report = ai_report or generate_rule_based_report([item], "2026-07-09")
-    blocks = markdown_to_feishu_blocks(report)
-    assert ai_report is None
-    assert blocks
-    assert any("https://example.com/api-failure" == block_text(block) for block in blocks)
+    with pytest.raises(RuntimeError, match="AI 翻译总结失败"):
+        generate_ai_report([item], "2026-07-09")
 
 
 def test_compact_item_only_truncates_body_not_urls():
@@ -304,7 +298,7 @@ https://model-invented.example/hallucination
     assert repaired.count("https://example.com/manual") == 2
 
 
-def test_api_degradation_still_writes_to_feishu(tmp_path, monkeypatch):
+def test_ai_report_success_writes_to_feishu(tmp_path, monkeypatch):
     item = make_item("https://example.com/full-pipeline")
 
     class FakeClient:
@@ -328,7 +322,17 @@ def test_api_degradation_still_writes_to_feishu(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "collect_manual_links", lambda *args, **kwargs: [])
     monkeypatch.setattr(main, "collect_social", lambda *args, **kwargs: [])
     monkeypatch.setattr(main, "collect_web_sources", lambda *args, **kwargs: [])
-    monkeypatch.setattr(main, "generate_ai_report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        main,
+        "generate_ai_report",
+        lambda *args, **kwargs: (
+            "# AI 前沿信息雷达｜2026-07-09\n\n"
+            "## 今日 AI 总览\n\n中文总览。\n\n"
+            "## 今日最重要的 5 条 AI 新闻\n\n"
+            "### 中文标题\n\n原文链接：\nhttps://example.com/full-pipeline\n\n"
+            "## 普通重要动态\n\n暂无。\n\n## 论文精选\n\n暂无。"
+        ),
+    )
     monkeypatch.setenv("AI_API_KEY", "模拟已配置")
     monkeypatch.setenv("AI_RADAR_FORCE_WRITE", "true")
 
@@ -338,6 +342,41 @@ def test_api_degradation_still_writes_to_feishu(tmp_path, monkeypatch):
     assert any("https://example.com/full-pipeline" == block_text(block) for block in client.written_blocks)
 
 
+def test_ai_failure_never_writes_to_feishu(tmp_path, monkeypatch):
+    item = make_item("https://example.com/ai-failure")
+
+    class FakeClient:
+        write_calls = 0
+
+        @staticmethod
+        def document_contains_text(_target):
+            return False
+
+        def append_blocks_to_document(self, _blocks):
+            self.write_calls += 1
+            return {"code": 0}
+
+    client = FakeClient()
+    monkeypatch.setattr(main, "PROJECT_DIR", tmp_path)
+    monkeypatch.setattr(main.FeishuClient, "from_env", lambda: client)
+    monkeypatch.setattr(main, "load_sources_config", lambda: {})
+    monkeypatch.setattr(main, "_collect_and_rank_content", lambda *args: [item])
+    monkeypatch.setattr(
+        main,
+        "generate_ai_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            RuntimeError("模拟 AI 翻译总结失败")
+        ),
+    )
+    monkeypatch.setenv("AI_API_KEY", "模拟已配置")
+    monkeypatch.setenv("AI_RADAR_FORCE_WRITE", "true")
+
+    with pytest.raises(RuntimeError, match="AI 翻译总结失败"):
+        main.run_once()
+
+    assert client.write_calls == 0
+
+
 def test_local_test_mode_only_writes_a_local_report(tmp_path, monkeypatch):
     item = make_item("https://example.com/local-test")
     monkeypatch.setattr(main, "PROJECT_DIR", tmp_path)
@@ -345,7 +384,17 @@ def test_local_test_mode_only_writes_a_local_report(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "_setup_logging", lambda: None)
     monkeypatch.setattr(main, "load_sources_config", lambda: {})
     monkeypatch.setattr(main, "_collect_and_rank_content", lambda *args: [item])
-    monkeypatch.setattr(main, "generate_ai_report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        main,
+        "generate_ai_report",
+        lambda *args, **kwargs: (
+            "# AI 前沿信息雷达｜2026-07-09\n\n"
+            "## 今日 AI 总览\n\n中文总览。\n\n"
+            "## 今日最重要的 5 条 AI 新闻\n\n"
+            "### 中文标题\n\n原文链接：\nhttps://example.com/local-test\n\n"
+            "## 普通重要动态\n\n暂无。\n\n## 论文精选\n\n暂无。"
+        ),
+    )
     monkeypatch.setattr(
         main.FeishuClient,
         "from_env",
