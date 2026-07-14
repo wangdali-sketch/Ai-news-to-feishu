@@ -254,6 +254,49 @@ def test_api_failure_stops_instead_of_degrading(monkeypatch):
         generate_ai_report([item], "2026-07-09")
 
 
+def test_json_parser_accepts_unescaped_control_characters():
+    parsed = ai_summarizer._parse_json_object('{"内容":"第一行\n第二行\t结束"}')
+    assert parsed["内容"] == "第一行\n第二行\t结束"
+
+
+def test_single_item_retries_when_model_format_is_invalid(monkeypatch):
+    valid = {
+        "中文标题": "测试工具发布结构化输出能力",
+        "原始标题": "Test Tool Structured Output",
+        "来源": "测试来源",
+        "平台": "tool",
+        "发布时间": "2026-07-09",
+        "原文链接": "https://example.com/retry",
+        "一句话总结": "这项更新增强了结构化输出能力，让自动化流程更容易获得稳定且可校验的结果。",
+        "核心内容": [
+            "工具新增了结构化输出能力，可以按照预先定义的字段返回结果。",
+            "开发者可以减少手工解析文本的步骤，并更早发现缺失字段。",
+            "实际使用时仍需检查接口限制、错误处理方式以及返回结果质量。",
+        ],
+        "为什么重要": "它能降低自动化流程因为输出格式变化而失败的概率。",
+        "我可以怎么用": "先用一个小型测试任务定义字段，再验证异常输入和重试逻辑。",
+        "适合谁关注": "需要构建 AI 自动化流程的初学者、开发者和产品人员。",
+        "学习价值": "可以学习如何校验模型输出并为失败情况设计安全的处理方式。",
+        "关键词": ["结构化输出", "自动化", "可靠性"],
+    }
+    responses = iter([
+        '{"中文标题":"字段不完整"}',
+        ai_summarizer.json.dumps(valid, ensure_ascii=False),
+    ])
+    monkeypatch.setattr(
+        ai_summarizer,
+        "_chat_completion",
+        lambda *args, **kwargs: next(responses),
+    )
+
+    result = ai_summarizer._summarize_single_item(
+        ai_summarizer._compact_item(make_item("https://example.com/retry"), 3000),
+        {"model": "test"},
+    )
+
+    assert result["中文标题"] == valid["中文标题"]
+
+
 def test_compact_item_only_truncates_body_not_urls():
     link = "https://example.com/very-long?" + "q=" + "z" * 2000
     item = make_item(link)

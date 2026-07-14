@@ -202,17 +202,34 @@ def _summarize_single_item(
 输入内容：
 {json.dumps(item, ensure_ascii=False)}
 """.strip()
-    content = _chat_completion(
-        settings,
-        system=(
-            "你是严谨的 AI 前沿情报编辑。只能依据输入材料提炼，不编造事实，"
-            "不生成输入中不存在的链接。"
-        ),
-        user=prompt,
-        max_tokens=1800,
-        attempts=2,
-    )
-    parsed = _parse_json_object(content)
+    last_error: Exception | None = None
+    for format_attempt in range(2):
+        content = _chat_completion(
+            settings,
+            system=(
+                "你是严谨的 AI 前沿情报编辑。只能依据输入材料提炼，不编造事实，"
+                "不生成输入中不存在的链接。"
+            ),
+            user=prompt,
+            max_tokens=1800,
+            attempts=2,
+        )
+        try:
+            parsed = _parse_json_object(content)
+            _validate_single_item_summary(parsed)
+            return parsed
+        except (ValueError, KeyError, TypeError) as exc:
+            last_error = exc
+            if format_attempt == 0:
+                LOGGER.warning("单条提炼返回格式不合格，将重新请求：%s", exc)
+
+    if last_error:
+        raise last_error
+    raise ValueError("单条提炼结果格式不合格")
+
+
+def _validate_single_item_summary(parsed: Dict[str, Any]) -> None:
+    """校验模型确实返回了完整的中文提炼结果。"""
     required = {
         "中文标题",
         "原始标题",
@@ -231,7 +248,22 @@ def _summarize_single_item(
         raise ValueError("单条提炼结果缺少必要字段")
     if not isinstance(parsed["核心内容"], list) or len(parsed["核心内容"]) < 3:
         raise ValueError("单条提炼的核心内容不足 3 条")
-    return parsed
+    chinese_fields = [
+        parsed["中文标题"],
+        parsed["一句话总结"],
+        *parsed["核心内容"],
+        parsed["为什么重要"],
+        parsed["我可以怎么用"],
+        parsed["适合谁关注"],
+        parsed["学习价值"],
+    ]
+    chinese_count = sum(
+        "\u4e00" <= char <= "\u9fff"
+        for value in chinese_fields
+        for char in str(value)
+    )
+    if chinese_count < 80:
+        raise ValueError("单条提炼的中文内容不足")
 
 
 def _generate_global_report(
@@ -385,47 +417,17 @@ def _compact_item(item: Dict[str, Any], max_text_per_item: int) -> Dict[str, Any
     }
 
 
-def _rule_summary(item: Dict[str, Any]) -> Dict[str, Any]:
-    summary = str(item.get("summary") or "暂无可用摘要")
-    points = [
-        point.strip(" -。")
-        for point in re.split(r"[。；;]\s*", summary)
-        if point.strip()
-    ][:5]
-    while len(points) < 3:
-        points.append(
-            [
-                "当前可见信息有限，关键结论需要结合原文核对",
-                "可先判断内容与自己的学习或工作场景是否相关",
-                "建议优先关注一手来源中的功能、方法和限制",
-            ][len(points)]
-        )
-    return {
-        "中文标题": item.get("title") or "未获取到标题",
-        "原始标题": item.get("title") or "未获取到标题",
-        "来源": item.get("source") or "未知来源",
-        "平台": item.get("platform") or "未知平台",
-        "发布时间": item.get("published_at") or "未知时间",
-        "原文链接": preferred_url(item),
-        "一句话总结": summary[:300],
-        "核心内容": points,
-        "为什么重要": item.get("reason") or "这条内容反映了当前 AI 领域的实际变化。",
-        "我可以怎么用": "先阅读原文核对细节，再选取一个与自身场景相关的要点实践。",
-        "适合谁关注": "普通 AI 学习者、开发者、产品经理和相关从业者",
-        "学习价值": "练习从一手信息中识别能力、应用场景和限制。",
-        "关键词": [item.get("category") or "AI", item.get("platform") or "信息源", "实践"],
-    }
-
-
 def _parse_json_object(value: str) -> Dict[str, Any]:
     text = _remove_code_fence(value)
     try:
-        payload = json.loads(text)
+        # 某些兼容接口会在 JSON 字符串中返回未转义的换行或制表符。
+        # strict=False 只放宽控制字符解析，不会接受缺字段或非对象结果。
+        payload = json.loads(text, strict=False)
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", text, flags=re.S)
         if not match:
             raise ValueError("大模型没有返回 JSON 对象")
-        payload = json.loads(match.group(0))
+        payload = json.loads(match.group(0), strict=False)
     if not isinstance(payload, dict):
         raise ValueError("大模型返回结果不是 JSON 对象")
     return payload
